@@ -76,11 +76,11 @@ class Codemaker
   end
 
   def check_color(mastermind)
-    mastermind[:feedback] = 'OOOO'
+    mastermind[:feedback] = ''
 
     4.times do |peg|
       if mastermind[:code].include?(mastermind[:guess][peg])
-        mastermind[:feedback][peg] = '?'
+        mastermind[:feedback] = mastermind[:feedback] << '?'
       end
     end
 
