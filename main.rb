@@ -33,15 +33,13 @@ module DecodingBoard
     puts '------------------------'
   end
 
-  private
-
   def self.new_code_peg(guess)
     code_peg = ''
     guess.each_char {|color| code_peg = code_peg + color + '-'}
     code_peg.chop!
   end
 
-  def self.new_key_peg(feedback)
+  def self.new_key_peg
     # Takes feedback and formats it like code_peg
     'O-O-O-O'
   end
@@ -56,13 +54,22 @@ class Codebreaker
 
   def guess
     puts 'Enter your guess as 4 characters: (enter help for rules)'
-    guess = gets.chomp
-    if guess == 'help'
-      self.rules
+    gets.chomp.upcase
+  end
+
+  def guess_check(guess)
+    if guess == 'HELP'
+      rules()
+      'fail'
+    elsif guess.length != 4
+      'fail'
     else
-      guess
+      guess.each_char do |color|
+        return 'fail' unless VALID_COLORS.include?(color)
+      end
     end
   end
+
 end
 
 class Codemaker
@@ -85,13 +92,19 @@ mastermind = {
   ]
 }
 
+VALID_COLORS = ['R', 'G', 'B', 'Y', 'O', 'V', 'I']
+
 
 ### For debugging
 mastermind[:player] = Codebreaker.new
 mastermind[:player].showboard(mastermind)
 
 guess = mastermind[:player].guess
-# a = DecodingBoard.new_code_peg(guess)
-# b = DecodingBoard.new_key_peg
-# DecodingBoard.add_peg(mastermind, a, b)
-# mastermind[:player].showboard(mastermind)
+
+until mastermind[:player].guess_check(guess) != 'fail'
+  guess = mastermind[:player].guess
+  a = DecodingBoard.new_code_peg(guess)
+end
+b = DecodingBoard.new_key_peg
+DecodingBoard.add_peg(mastermind, a, b)
+mastermind[:player].showboard(mastermind)
