@@ -27,9 +27,15 @@ module DecodingBoard
     code_peg.chop!
   end
 
-  def self.new_key_peg
+  def self.new_key_peg(mastermind)
     # Takes feedback and formats it like code_peg
-    'O-O-O-O'
+    key_peg = ''
+    mastermind[:feedback].each_char { |peg| key_peg = key_peg << peg if peg == '!' || peg == '?' }
+    until key_peg.length == 4
+      key_peg = key_peg + 'O'
+    end
+    key_peg.gsub!('', '-')
+    key_peg[1..].chop!
   end
 
   def self.add_peg(mastermind, code_peg, key_peg)
@@ -76,10 +82,9 @@ class Codemaker
   end
 
   def check_color(mastermind)
-    mastermind[:feedback] = ''
 
     4.times do |peg|
-      if mastermind[:code].include?(mastermind[:guess][peg])
+      if mastermind[:feedback].include?(mastermind[:guess][peg])
         mastermind[:feedback] = mastermind[:feedback] << '?'
       end
     end
@@ -88,12 +93,15 @@ class Codemaker
   end
 
   def check_both(mastermind)
-    count = 0
+    mastermind[:feedback] = ''
+    
     4.times do |peg|
-      count += 1 if mastermind[:code][peg] == mastermind[:guess][peg]
-    end
-    count.times do |peg|
-      mastermind[:feedback][peg] = '!'
+      if mastermind[:code][peg] == mastermind[:guess][peg]
+        mastermind[:feedback] = mastermind[:feedback] << '!'
+
+      else
+        mastermind[:feedback] = mastermind[:feedback] << mastermind[:code][peg]
+      end
     end
     mastermind[:feedback]
   end
@@ -140,15 +148,16 @@ mastermind[:cpu] = Codemaker.new
 
 puts "code is: #{mastermind[:code] = mastermind[:cpu].make_code}"
 
-
 until mastermind[:player].guess_check(mastermind[:guess]) != 'fail'
   mastermind[:guess] = mastermind[:player].guess
   code_peg = DecodingBoard.new_code_peg(mastermind[:guess])
 end
 
-# key_peg = DecodingBoard.new_key_peg
-# DecodingBoard.add_peg(mastermind, code_peg, key_peg)
-# mastermind[:player].showboard(mastermind)
 
-puts mastermind[:feedback] = mastermind[:cpu].check_color(mastermind)
+
 puts mastermind[:feedback] = mastermind[:cpu].check_both(mastermind)
+puts mastermind[:feedback] = mastermind[:cpu].check_color(mastermind)
+
+key_peg = DecodingBoard.new_key_peg(mastermind)
+DecodingBoard.add_peg(mastermind, code_peg, key_peg)
+mastermind[:player].showboard(mastermind)
