@@ -12,6 +12,7 @@ module Mastermind
       + Correct position AND color is represented with !
       + Correct color only is represented with ?
       + Incorrect guesses is represented with O
+      + The Codebreaker has 8 turns to guess the code
       ---------------------------
     TEXT
   end
@@ -45,12 +46,10 @@ module Mastermind
   end
 
   def self.check_winner(gamestate)
-    if gamestate[:feedback] == "!-!-!-!"
-      if gamestate[:player].class == "Codebreaker"
-        gamestate[:winner] = 'Player'
-      else 
-        gamestate[:winner] = 'Computer'
-      end
+    if gamestate[:feedback] == '!!!!'
+      gamestate[:winner] = gamestate[:player].instance_of?(Codebreaker) ? 'Player' : 'Computer'
+    elsif gamestate[:turn] == 8
+      gamestate[:winner] = gamestate[:player].instance_of?(Codemaker) ? 'Player' : 'Computer'
     end
   end
 
@@ -58,6 +57,10 @@ module Mastermind
     gamestate[:feedback] = ''
     gamestate[:guess] = 'fail'
     gamestate[:turn] += 1
+  end
+
+  def self.game_over(gamestate)
+    puts "#{gamestate[:winner]} Wins!"
   end
 end
 
@@ -104,11 +107,11 @@ class Codemaker
   # Modify feedback by checking guess for correct position AND color
   def check_both(gamestate)
     4.times do |peg|
-      if gamestate[:code][peg] == gamestate[:guess][peg]
-        gamestate[:feedback] = gamestate[:feedback] << '!'
-      else
-        gamestate[:feedback] = gamestate[:feedback] << gamestate[:code][peg]
-      end
+      gamestate[:feedback] += if gamestate[:code][peg] == gamestate[:guess][peg]
+                                '!'
+                              else
+                                gamestate[:code][peg]
+                              end
     end
     gamestate[:feedback]
   end
@@ -156,10 +159,10 @@ gamestate[:player] = Codebreaker.new
 gamestate[:cpu] = Codemaker.new
 
 # Generate code for cpu
-gamestate[:code] = gamestate[:cpu].make_code
-# puts "code is: #{gamestate[:code] = gamestate[:cpu].make_code}"
+# gamestate[:code] = gamestate[:cpu].make_code
+puts "code is: #{gamestate[:code] = gamestate[:cpu].make_code}"
 
-until gamestate[:turn] == 12 || gamestate[:winner] != ''
+until gamestate[:turn] > 9 || gamestate[:winner] != ''
   # Enter guess and code peg
   until gamestate[:player].guess_check(gamestate[:guess]) != 'fail'
     gamestate[:guess] = gamestate[:player].guess
@@ -177,3 +180,5 @@ until gamestate[:turn] == 12 || gamestate[:winner] != ''
   Mastermind.check_winner(gamestate)
   Mastermind.next_turn(gamestate)
 end
+
+Mastermind.game_over(gamestate)
