@@ -1,9 +1,9 @@
 # Methods for manipulating decoding board
-module DecodingBoard
+module Mastermind
   # Outputs game rules
   def rules
     puts <<~TEXT
-      +++ Rules of Mastermind +++
+      +++ Rules of MASTERMIND +++
       ---------------------------
       + Available colors are:
       Red, Green, Blue, Yellow, Orange, Violet, Indigo
@@ -17,9 +17,9 @@ module DecodingBoard
   end
 
   # Shows current board configuration
-  def showboard(mastermind)
+  def showboard(gamestate)
     puts '-------MASTERMIND-------'
-    mastermind[:decoding_board].each { |row| puts "#{mastermind[:turn]}. #{row.to_s.gsub!('"', '')} ||" }
+    gamestate[:decoding_board].each_with_index { |row, i| puts "#{i + 1}. #{row.to_s.gsub!('"', '')} ||" }
     puts '------------------------'
   end
 
@@ -31,23 +31,39 @@ module DecodingBoard
   end
 
   # Creates new key peg from feedback in Y-Y-Y-Y format
-  def self.new_key_peg(mastermind)
+  def self.new_key_peg(gamestate)
     key_peg = ''
-    mastermind[:feedback].each_char { |peg| key_peg = key_peg << peg if peg == '!' || peg == '?' }
+    gamestate[:feedback].each_char { |peg| key_peg = key_peg << peg if peg == '!' || peg == '?' }
     key_peg += 'O' until key_peg.length == 4
     key_peg.gsub!('', '-')
     key_peg[1..].chop!
   end
 
   # Adds formatted pegs to decoding board
-  def self.add_peg(mastermind, code_peg, key_peg)
-    mastermind[:decoding_board].push([code_peg, key_peg])
+  def self.add_peg(gamestate, code_peg, key_peg)
+    gamestate[:decoding_board].push([code_peg, key_peg])
+  end
+
+  def self.check_winner(gamestate)
+    if gamestate[:feedback] == "!-!-!-!"
+      if gamestate[:player].class == "Codebreaker"
+        gamestate[:winner] = 'Player'
+      else 
+        gamestate[:winner] = 'Computer'
+      end
+    end
+  end
+
+  def self.next_turn(gamestate)
+    gamestate[:feedback] = ''
+    gamestate[:guess] = 'fail'
+    gamestate[:turn] += 1
   end
 end
 
 # Methods for codebreaker
 class Codebreaker
-  include DecodingBoard
+  include Mastermind
 
   # Inputs user guess 
   def guess
@@ -72,7 +88,7 @@ end
 
 # Methods for codemaker
 class Codemaker
-  include DecodingBoard
+  include Mastermind
 
   # Creates a randomly selected code from valid color pool
   def make_code
@@ -86,75 +102,78 @@ class Codemaker
   end
 
   # Modify feedback by checking guess for correct position AND color
-  def check_both(mastermind)
-    mastermind[:feedback] = ''
+  def check_both(gamestate)
     4.times do |peg|
-      if mastermind[:code][peg] == mastermind[:guess][peg]
-        mastermind[:feedback] = mastermind[:feedback] << '!'
+      if gamestate[:code][peg] == gamestate[:guess][peg]
+        gamestate[:feedback] = gamestate[:feedback] << '!'
       else
-        mastermind[:feedback] = mastermind[:feedback] << mastermind[:code][peg]
+        gamestate[:feedback] = gamestate[:feedback] << gamestate[:code][peg]
       end
     end
-    mastermind[:feedback]
+    gamestate[:feedback]
   end
 
   # Modify feedback by checking guess with modified code that excludes correct position and color pegs
-  def check_color(mastermind)
+  def check_color(gamestate)
     4.times do |peg|
-      mastermind[:feedback] += '?' if mastermind[:feedback].include?(mastermind[:guess][peg])
+      gamestate[:feedback] += '?' if gamestate[:feedback].include?(gamestate[:guess][peg])
     end
-    mastermind[:feedback]
+    gamestate[:feedback]
   end
 
   # Creates complete feedback
-  def new_feedback(mastermind)
-    check_both(mastermind)
-    check_color(mastermind)
+  def new_feedback(gamestate)
+    check_both(gamestate)
+    check_color(gamestate)
   end
 end
 
-mastermind = {
+gamestate = {
   player: '',
   cpu: '',
   turn: 1,
-  decoding_board: [
-  ],
+  decoding_board: [],
   guess: '',
   code: '',
-  feedback: ''
+  feedback: '',
+  winner: '',
 }
 
 VALID_COLORS = ['R', 'G', 'B', 'Y', 'O', 'V', 'I']
-
-### Gameflow for player
-# As codebreaker
-  # Generate code for cpu
-  # Enter guess
-  # Generate feedback for cpu
-  # Display game result
 
 # As codemaker
   # Enter code
   # Generage cpu guess
   # Enter feedback
-    # Modify cpu guess based on feedback
+  # Modify cpu guess based on feedback
   # Display game result
 
 
 ### For debugging
-mastermind[:player] = Codebreaker.new
-mastermind[:cpu] = Codemaker.new
 
-mastermind[:code] = mastermind[:cpu].make_code
-# puts "code is: #{mastermind[:code] = mastermind[:cpu].make_code}"
+# Assign Roles
+gamestate[:player] = Codebreaker.new
+gamestate[:cpu] = Codemaker.new
 
-until mastermind[:player].guess_check(mastermind[:guess]) != 'fail'
-  mastermind[:guess] = mastermind[:player].guess
-  code_peg = DecodingBoard.new_code_peg(mastermind[:guess])
+# Generate code for cpu
+gamestate[:code] = gamestate[:cpu].make_code
+# puts "code is: #{gamestate[:code] = gamestate[:cpu].make_code}"
+
+until gamestate[:turn] == 12 || gamestate[:winner] != ''
+  # Enter guess and code peg
+  until gamestate[:player].guess_check(gamestate[:guess]) != 'fail'
+    gamestate[:guess] = gamestate[:player].guess
+    code_peg = Mastermind.new_code_peg(gamestate[:guess])
+  end
+
+  # Generate feedback for cpu and key peg
+  gamestate[:feedback] = gamestate[:cpu].new_feedback(gamestate)
+  key_peg = Mastermind.new_key_peg(gamestate)
+
+  # Display game result
+  Mastermind.add_peg(gamestate, code_peg, key_peg)
+  gamestate[:player].showboard(gamestate)
+
+  Mastermind.check_winner(gamestate)
+  Mastermind.next_turn(gamestate)
 end
-
-mastermind[:feedback] = mastermind[:cpu].new_feedback(mastermind)
-key_peg = DecodingBoard.new_key_peg(mastermind)
-
-DecodingBoard.add_peg(mastermind, code_peg, key_peg)
-mastermind[:player].showboard(mastermind)
