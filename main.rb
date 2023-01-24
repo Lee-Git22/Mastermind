@@ -1,7 +1,7 @@
 # Methods for manipulating decoding board
 module Mastermind
   # Outputs game rules
-  def rules
+  def self.rules
     puts <<~TEXT
       +++ Rules of MASTERMIND +++
       ---------------------------
@@ -17,11 +17,40 @@ module Mastermind
     TEXT
   end
 
+  def self.assign_roles(gamestate)
+    puts 'Enter 1 to play as Codebreaker, and 2 to play as Codemaker'
+    case gets.chomp
+    when '1'
+      gamestate[:player] = Codebreaker.new
+      gamestate[:cpu] = Codemaker.new
+    when '2'
+      gamestate[:player] = Codemaker.new
+      gamestate[:cpu] = Codebreaker.new
+    else
+      'fail'
+    end
+    puts "You are playering as #{gamestate[:player].class}..."
+  end
+
   # Shows current board configuration
-  def showboard(gamestate)
+  def self.showboard(gamestate)
     puts '-------MASTERMIND-------'
     gamestate[:decoding_board].each_with_index { |row, i| puts "#{i + 1}. #{row.to_s.gsub!('"', '')} ||" }
     puts '------------------------'
+  end
+
+  # Ensures guess is in correct format
+  def self.validate_input(input)
+    if input == 'HELP'
+      self.rules
+      'fail'
+    elsif input.length != 4
+      'fail'
+    else
+      input.each_char do |color|
+        return 'fail' unless VALID_COLORS.include?(color)
+      end
+    end
   end
 
   # Creates new code peg from guess in X-X-X-X format
@@ -68,30 +97,23 @@ end
 class Codebreaker
   include Mastermind
 
-  # Inputs user guess 
-  def guess
+  # Inputs user guess
+  def input_guess
     puts 'Enter your guess as 4 characters: (enter help for rules)'
     gets.chomp.upcase
   end
 
-  # Ensures guess is in correct format
-  def guess_check(guess)
-    if guess == 'HELP'
-      rules
-      'fail'
-    elsif guess.length != 4
-      'fail'
-    else
-      guess.each_char do |color|
-        return 'fail' unless VALID_COLORS.include?(color)
-      end
-    end
-  end
 end
 
 # Methods for codemaker
 class Codemaker
   include Mastermind
+
+  # Inputs user guess
+  def input_code
+    puts 'Enter your code as 4 characters: (enter help for rules)'
+    gets.chomp.upcase
+  end
 
   # Creates a randomly selected code from valid color pool
   def make_code
@@ -139,7 +161,7 @@ gamestate = {
   guess: '',
   code: '',
   feedback: '',
-  winner: '',
+  winner: ''
 }
 
 VALID_COLORS = ['R', 'G', 'B', 'Y', 'O', 'V', 'I']
@@ -155,27 +177,37 @@ VALID_COLORS = ['R', 'G', 'B', 'Y', 'O', 'V', 'I']
 ### For debugging
 
 # Assign Roles
-gamestate[:player] = Codebreaker.new
-gamestate[:cpu] = Codemaker.new
+Mastermind.assign_roles(gamestate)
 
-# Generate code for cpu
-# gamestate[:code] = gamestate[:cpu].make_code
-puts "code is: #{gamestate[:code] = gamestate[:cpu].make_code}"
-
+# Play game for 8 turns or until code is guessed
 until gamestate[:turn] > 9 || gamestate[:winner] != ''
-  # Enter guess and code peg
-  until gamestate[:player].guess_check(gamestate[:guess]) != 'fail'
-    gamestate[:guess] = gamestate[:player].guess
-    code_peg = Mastermind.new_code_peg(gamestate[:guess])
-  end
 
-  # Generate feedback for cpu and key peg
-  gamestate[:feedback] = gamestate[:cpu].new_feedback(gamestate)
-  key_peg = Mastermind.new_key_peg(gamestate)
+  # Gameplay if player is codebreaker
+  if gamestate[:player].instance_of?(Codebreaker)
+
+    # Generate code for cpu
+    gamestate[:code] = gamestate[:cpu].make_code
+
+    # Enter guess and code peg
+    until Mastermind.validate_input(gamestate[:guess]) != 'fail'
+      gamestate[:guess] = gamestate[:player].input_guess
+      code_peg = Mastermind.new_code_peg(gamestate[:guess])
+    end
+
+    # Generate feedback for cpu and key peg
+    gamestate[:feedback] = gamestate[:cpu].new_feedback(gamestate)
+    key_peg = Mastermind.new_key_peg(gamestate)
+  else
+    until Mastermind.validate_input(gamestate[:code]) != 'fail'
+      gamestate[:code] = gamestate[:player].input_code
+      # code_peg = Mastermind.new_code_peg(gamestate[:guess])
+    end
+
+  end
 
   # Display game result
   Mastermind.add_peg(gamestate, code_peg, key_peg)
-  gamestate[:player].showboard(gamestate)
+  Mastermind.showboard(gamestate)
 
   Mastermind.check_winner(gamestate)
   Mastermind.next_turn(gamestate)
