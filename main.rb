@@ -23,13 +23,23 @@ module Mastermind
     when '1'
       gamestate[:player] = Codebreaker.new
       gamestate[:cpu] = Codemaker.new
+      gamestate[:roles] = true
+
     when '2'
       gamestate[:player] = Codemaker.new
       gamestate[:cpu] = Codebreaker.new
+      gamestate[:roles] = true
+
     else
-      'fail'
+      gamestate[:roles] = false
     end
-    puts "You are playering as #{gamestate[:player].class}..."
+  end
+
+  def self.declare_role(gamestate)
+    puts <<~TEXT
+      You are playering as #{gamestate[:player].class}...
+      ---------------------------
+    TEXT
   end
 
   # Shows current board configuration
@@ -41,15 +51,27 @@ module Mastermind
 
   # Ensures guess is in correct format
   def self.validate_input(input)
-    if input == 'HELP'
-      self.rules
+    case input
+    when 'HELP'
+      rules
       'fail'
-    elsif input.length != 4
+    when input.length != 4
       'fail'
     else
       input.each_char do |color|
         return 'fail' unless VALID_COLORS.include?(color)
       end
+    end
+  end
+
+  def self.validate_feedback(gamestate)
+    if gamestate[:feedback].upcase == 'HELP'
+      rules
+      'fail'
+    elsif gamestate[:feedback].length <= 4
+      gamestate[:feedback].each_char {|char| return 'fail' unless char == '?' || char == '!' }
+    else
+      'fail'
     end
   end
 
@@ -83,13 +105,24 @@ module Mastermind
   end
 
   def self.next_turn(gamestate)
-    gamestate[:feedback] = ''
+    gamestate[:memory] = gamestate[:guess]
     gamestate[:guess] = 'fail'
     gamestate[:turn] += 1
   end
 
   def self.game_over(gamestate)
-    puts "#{gamestate[:winner]} Wins!"
+    puts "The code was #{gamestate[:code]}, #{gamestate[:winner]} Wins!"
+  end
+
+  # Creates a randomly selected code from valid color pool
+  def make_code
+    code = ''
+    rng = Random.new
+    until code.length == 4
+      color = VALID_COLORS[rng.rand(0...6)]
+      code += color unless code.include?(color)
+    end
+    code
   end
 end
 
@@ -101,6 +134,28 @@ class Codebreaker
   def input_guess
     puts 'Enter your guess as 4 characters: (enter help for rules)'
     gets.chomp.upcase
+  end
+
+  def make_smart_guess(gamestate)
+    # take gamestate[:feedback] and count number of ! and ?s, for each count, take from last guess then RNG remaining count
+    rng = Random.new
+    code = ''
+    unless gamestate[:turn] == 1
+      puts 'hello'
+      puts gamestate[:feedback]
+      puts gamestate[:memory]
+      until code.length == gamestate[:memory].length do
+        color = gamestate[:memory][rng.rand(0...4)]
+        code += color unless code.include?(color)
+      end
+    end
+
+    until code.length == 4
+      color = VALID_COLORS[rng.rand(0...6)]
+      code += color unless code.include?(color)
+    end
+    gamestate[:feedback] = 'fail'
+    code
   end
 
 end
@@ -115,19 +170,16 @@ class Codemaker
     gets.chomp.upcase
   end
 
-  # Creates a randomly selected code from valid color pool
-  def make_code
-    code = ''
-    rng = Random.new
-    until code.length == 4
-      color = VALID_COLORS[rng.rand(0...6)]
-      code += color unless code.include?(color)
-    end
-    code
+  def input_feedback(gamestate)
+    puts "Your code is: #{gamestate[:code]}..."
+    puts "Computer guessed #{gamestate[:guess]}: Enter your feedback with '!' and '?' (enter help for rules)"
+    gets.chomp.upcase
   end
 
   # Modify feedback by checking guess for correct position AND color
   def check_both(gamestate)
+    gamestate[:feedback] = ''
+
     4.times do |peg|
       gamestate[:feedback] += if gamestate[:code][peg] == gamestate[:guess][peg]
                                 '!'
@@ -156,28 +208,21 @@ end
 gamestate = {
   player: '',
   cpu: '',
+  roles: false,
   turn: 1,
   decoding_board: [],
-  guess: '',
-  code: '',
-  feedback: '',
+  guess: 'fail',
+  memory: '',
+  code: 'fail',
+  feedback: 'fail',
   winner: ''
 }
 
 VALID_COLORS = ['R', 'G', 'B', 'Y', 'O', 'V', 'I']
 
-# As codemaker
-  # Enter code
-  # Generage cpu guess
-  # Enter feedback
-  # Modify cpu guess based on feedback
-  # Display game result
-
-
-### For debugging
-
 # Assign Roles
-Mastermind.assign_roles(gamestate)
+gamestate[:roles] = Mastermind.assign_roles(gamestate) until gamestate[:roles] == true
+Mastermind.declare_role(gamestate)
 
 # Play game for 8 turns or until code is guessed
 until gamestate[:turn] > 9 || gamestate[:winner] != ''
@@ -186,7 +231,7 @@ until gamestate[:turn] > 9 || gamestate[:winner] != ''
   if gamestate[:player].instance_of?(Codebreaker)
 
     # Generate code for cpu
-    gamestate[:code] = gamestate[:cpu].make_code
+    puts gamestate[:code] = gamestate[:cpu].make_code if gamestate[:code] == 'fail'
 
     # Enter guess and code peg
     until Mastermind.validate_input(gamestate[:guess]) != 'fail'
@@ -196,14 +241,21 @@ until gamestate[:turn] > 9 || gamestate[:winner] != ''
 
     # Generate feedback for cpu and key peg
     gamestate[:feedback] = gamestate[:cpu].new_feedback(gamestate)
-    key_peg = Mastermind.new_key_peg(gamestate)
   else
     until Mastermind.validate_input(gamestate[:code]) != 'fail'
       gamestate[:code] = gamestate[:player].input_code
-      # code_peg = Mastermind.new_code_peg(gamestate[:guess])
     end
 
+    # Generate guess and reset feedback
+    gamestate[:guess] = gamestate[:cpu].make_smart_guess(gamestate)
+    code_peg = Mastermind.new_code_peg(gamestate[:guess])
+    
+
+    # Input feedback
+    gamestate[:feedback] = gamestate[:player].input_feedback(gamestate) until Mastermind.validate_feedback(gamestate) != 'fail'
   end
+
+  key_peg = Mastermind.new_key_peg(gamestate)
 
   # Display game result
   Mastermind.add_peg(gamestate, code_peg, key_peg)
