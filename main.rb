@@ -192,8 +192,10 @@ class Codemaker
 
   # Modify feedback by checking guess with modified code that excludes correct position and color pegs
   def check_color(gamestate)
-    4.times do |peg|
-      gamestate[:feedback] += '?' if gamestate[:feedback].include?(gamestate[:guess][peg])
+    filtered = gamestate[:guess].chars.uniq
+    filtered = filtered.join.to_s
+    filtered.length.times do |peg|
+      gamestate[:feedback] += '?' if gamestate[:feedback].include?(filtered[peg])
     end
     gamestate[:feedback]
   end
